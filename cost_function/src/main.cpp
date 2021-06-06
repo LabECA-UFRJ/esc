@@ -8,6 +8,7 @@
 
 #include "std_msgs/Float64.h"
 
+#include "cost_function/LowPassFilter.h"
 #include "cost_function/Utils.h"
 
 #include <cmath>
@@ -34,6 +35,11 @@ public:
         WaitTransformAvailable();
 
         ros::Rate rate(GetParam<float>("~rate"));
+
+        auto samplingPeriod = 1.0 / GetParam<double>("~rate");
+        auto omegaLow = GetParam<double>("~omega");
+        LowPassFilter lowFilter(omegaLow, samplingPeriod);
+
         while (_nh.ok())
         {
             auto transform = GetTransform();
@@ -46,6 +52,12 @@ public:
 
             std_msgs::Float64 cost;
             cost.data = Evaluate(robot_x, robot_y, source_x, source_y);
+
+            double filteredCost;
+            lowFilter.update(cost.data, filteredCost);
+
+            cost.data = filteredCost;
+
             _costPub.publish(cost);
 
             ros::spinOnce();
